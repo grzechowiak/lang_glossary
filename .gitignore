@@ -1,6 +1,26 @@
+# Ignore the playground directory
+99_playground/
+
+# Virtual environments
+.venv/
 venv/
-__pycache__/
+
+# IDE
 .idea/
+
+# Python
+__pycache__/
 *.pyc
 .env
-99_playground/
+.python-version
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Vector databases / generated DB files
+vector_dbs/
+*.sqlite3
+*.bin
+
+
+
