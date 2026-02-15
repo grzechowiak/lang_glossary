@@ -1,0 +1,21 @@
+Table Name;Data Steward Name;Data Steward E-Mail;Data Owner Name;Data Owner E-Mail
+client_account;Elena Petra;elena.petra@aureliacap.com;Victor Vance;victor.vance@aureliacap.com
+data_manag_table;Ivana Horvat;ivana.horvat@aureliacap.com;Sarah Jenkins;sarah.jenkins@aureliacap.com
+risk_monitor;Elena Petra;elena.petra@aureliacap.com;Marcus Thorne;marcus.thorne@aureliacap.com
+dataset_4_transactions;Lukas Nowak;lukas.nowak@aureliacap.com;Sarah Jenkins;sarah.jenkins@aureliacap.com
+dataset_5_loans;Michael Chen;michael.chen@aureliacap.com;David O'Reilly;david.oreilly@aureliacap.com
+dataset_6_riskscores;Lukas Nowak;lukas.nowak@aureliacap.com;David O'Reilly;david.oreilly@aureliacap.com
+dataset_7_portfolio;Patricia Gomez;patricia.gomez@aureliacap.com;Marcus Thorne;marcus.thorne@aureliacap.com
+dataset_8_riskscores;Lukas Nowak;lukas.nowak@aureliacap.com;Victor Vance;victor.vance@aureliacap.com
+dataset_9_clients;Elena Petra;elena.petra@aureliacap.com;Victor Vance;victor.vance@aureliacap.com
+dataset_10_loans;Lukas Nowak;lukas.nowak@aureliacap.com;Sarah Jenkins;sarah.jenkins@aureliacap.com
+dataset_11_riskscores;Lukas Nowak;lukas.nowak@aureliacap.com;Victor Vance;victor.vance@aureliacap.com
+dataset_12_portfolio;Michael Chen;michael.chen@aureliacap.com;Victor Vance;victor.vance@aureliacap.com
+dataset_13_riskscores;Ivana Horvat;ivana.horvat@aureliacap.com;Victor Vance;victor.vance@aureliacap.com
+dataset_14_portfolio;Lukas Nowak;lukas.nowak@aureliacap.com;Sarah Jenkins;sarah.jenkins@aureliacap.com
+dataset_15_portfolio;Michael Chen;michael.chen@aureliacap.com;Marcus Thorne;marcus.thorne@aureliacap.com
+dataset_16_clients;Patricia Gomez;patricia.gomez@aureliacap.com;Victor Vance;victor.vance@aureliacap.com
+dataset_17_transactions;Michael Chen;michael.chen@aureliacap.com;David O'Reilly;david.oreilly@aureliacap.com
+dataset_18_trades;Adam Kowalski;adam.kowalski@aureliacap.com;Marcus Thorne;marcus.thorne@aureliacap.com
+dataset_19_riskscores;Adam Kowalski;adam.kowalski@aureliacap.com;David O'Reilly;david.oreilly@aureliacap.com
+dataset_20_clients;Sana Iqbal;sana.iqbal@aureliacap.com;Alisa Zhang;alisa.zhang@aureliacap.com
