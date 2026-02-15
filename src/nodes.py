@@ -139,29 +139,65 @@ def rag_retrieval_node(state: AgentState, project_root: Path) -> AgentState:
 def generator_node(state: AgentState):
     """5. Define the Generator Agent logic"""
 
-    print(f"--- GENERATOR: Filling the template (Attempt {state['iterations'] + 1}) ---")
+    iterations = state.get('iterations', 0) + 1
+    print(f"--- GENERATOR: Filling the template (Attempt {iterations}) ---")
 
-    # Bring context from state
-    full_table_context = json.dumps(state.get('entire_table_context'), indent=2) # Convert dict to JSON on the fly so it's better formatted when supplying to the Agent
-    rag_company_context = (state.get('RAG_company_context', "No additional context provided."))
+    # Check if this is a human-requested regeneration
+    has_feedback = state.get('human_feedback') is not None
 
-    # Prepare critic feedback if available
-    critic_feedback = ""
-    if state['error_message'] != "none":
-        critic_feedback = f"\n\nCRITIC FEEDBACK FROM PREVIOUS ATTEMPT:\n{state['error_message']}\nPlease fix these issues."
+    if has_feedback:
+        print(f"ℹ️ Generating content based on feedback: {state.get('human_feedback', '')[:50]}...")
+    else:
+        print("ℹ️ Generating initial content")
 
-    # Format the prompt using LangChain's template
-    formatted_messages = GENERATOR_PROMPT.format_messages(
-        full_table_context=full_table_context,
-        rag_company_context=rag_company_context,
-        critic_feedback=critic_feedback
+    try:
+        # Bring context from state
+        full_table_context = json.dumps(state.get('entire_table_context', {}), indent=2)
+        rag_company_context = state.get('RAG_company_context', "No additional context provided.")
+
+        # Prepare critic feedback if available
+        critic_feedback = ""
+        if state.get('error_message', "none") != "none":
+            critic_feedback = f"\n\nCRITIC FEEDBACK FROM PREVIOUS ATTEMPT:\n{state.get('error_message')}\nPlease fix these issues."
+
+        # Prepare human feedback if available
+        human_feedback = ""
+        if has_feedback:
+            human_feedback = f"\n\nHUMAN FEEDBACK:\n{state.get('human_feedback')}"
+
+            # Include any history of human modifications
+            if state.get('human_review_history'):
+                human_feedback += "\n\nPrevious human modifications:"
+                for entry in state.get('human_review_history'):
+                    human_feedback += f"\n- {entry}"
+
+        # Format the prompt using LangChain's template
+        formatted_messages = GENERATOR_PROMPT.format_messages(
+            full_table_context=full_table_context,
+            rag_company_context=rag_company_context,
+            critic_feedback=critic_feedback,
+            human_feedback=human_feedback
         )
 
-    response = structured_llm.invoke(formatted_messages)
-    return {
-        "result": response.columns,
-        "iterations": state['iterations'] + 1
-    }
+        print("Generating content...")
+        response = structured_llm.invoke(formatted_messages)
+        print("✅ Content generated successfully")
+
+        return {
+            "result": response.columns,
+            "iterations": iterations
+        }
+    except Exception as e:
+        print(f"Error in generator: {e}")
+        import traceback
+        traceback.print_exc()
+
+        # Return the original content if there's an error
+        return {
+            "result": state.get('result', []),
+            "iterations": iterations,
+            "error_message": f"Generator error: {str(e)}"
+        }
 
 
 # --- NODE 6: Validator Agent ---
@@ -170,43 +206,150 @@ def validator_node(state: AgentState):
 
     print("--- CRITIC: Reviewing... ---")
 
-    # Calculate counts to check for data loss
-    input_table = state.get('entire_table_context', {})
-    expected_count = len(input_table.get('Column Name', []))
-    actual_count = len(state['result'])
+    # Check if human feedback is present
+    has_human_feedback = state.get('human_feedback') is not None
 
-    current_work = "\n".join([
-        f"Column: {c.column_name}\n"
-        f"Proposed Description: {c.column_description}\n"
-        f"Source Used: {c.extra__add_source_explained}\n"
-        f"Evidence/Logic: {c.extra__add_citation_of_the_hit}\n"
-        "---"
-        for c in state['result']
-    ])
-
-    # Bring context from state
-    rag_company_context = state.get('RAG_company_context', "No additional context provided.")
-    full_table_context = state.get('entire_table_context', {})
-
-    # Format the prompt using LangChain's template
-    formatted_messages = VALIDATOR_PROMPT.format_messages(
-        rag_company_context=rag_company_context,
-        full_table_context=full_table_context,
-        current_work=current_work,
-        expected_count=expected_count,
-        actual_count=actual_count
-    )
-
-    review = critic_llm.invoke(formatted_messages)
-
-    if not review.is_valid:
-        print(f"--- CRITIC FEEDBACK: {review.feedback} ---")
+    # If this is a human-requested regeneration, use simplified validation
+    if has_human_feedback:
+        print("✓ Simplified validation for human-guided changes")
         return {
-            "error_message": review.feedback,
-            "review_history_validator": [f"Step {state['iterations']} Critic: {review.feedback}"]
+            "error_message": "none",  # Pass validation
+            "review_history_validator": [f"Validation simplified: Changes guided by human feedback"]
         }
 
-    return {
-        "error_message": "none",
-        "review_history_validator": [f"Critique (Passed): {review.feedback}"]
-    }
+    try:
+        # Regular validation
+        # Calculate counts to check for data loss
+        input_table = state.get('entire_table_context', {})
+        expected_count = len(input_table.get('Column Name', []))
+        actual_count = len(state['result'])
+
+        # Basic sanity check
+        if actual_count == 0:
+            return {
+                "error_message": "No results generated.",
+                "review_history_validator": [f"Validation failed: No results"]
+            }
+
+        if actual_count != expected_count:
+            return {
+                "error_message": f"Expected {expected_count} columns but got {actual_count}.",
+                "review_history_validator": [f"Validation failed: Column count mismatch"]
+            }
+
+        current_work = "\n".join([
+            f"Column: {c.column_name}\n"
+            f"Proposed Description: {c.column_description}\n"
+            f"Source Used: {c.extra__add_source_explained}\n"
+            f"Evidence/Logic: {c.extra__add_citation_of_the_hit}\n"
+            "---"
+            for c in state['result']
+        ])
+
+        # Bring context from state
+        rag_company_context = state.get('RAG_company_context', "No additional context provided.")
+        full_table_context = state.get('entire_table_context', {})
+
+        # Format the prompt using LangChain's template
+        formatted_messages = VALIDATOR_PROMPT.format_messages(
+            rag_company_context=rag_company_context,
+            full_table_context=full_table_context,
+            current_work=current_work,
+            expected_count=expected_count,
+            actual_count=actual_count
+        )
+
+        review = critic_llm.invoke(formatted_messages)
+
+        if not review.is_valid:
+            print(f"--- CRITIC FEEDBACK: {review.feedback} ---")
+            return {
+                "error_message": review.feedback,
+                "review_history_validator": [f"Step {state['iterations']} Critic: {review.feedback}"]
+            }
+
+        print("✅ Validation passed")
+        return {
+            "error_message": "none",
+            "review_history_validator": [f"Critique (Passed): {review.feedback}"]
+        }
+    except Exception as e:
+        print(f"Error in validator: {e}")
+        # If we've already tried a few times, just pass it to human review
+        if state.get('iterations', 0) >= 2:
+            return {
+                "error_message": "none",
+                "review_history_validator": [f"Validation error, but proceeding: {str(e)}"]
+            }
+        else:
+            return {
+                "error_message": f"Validation error: {str(e)}",
+                "review_history_validator": [f"Validation error: {str(e)}"]
+            }
+
+# --- NODE 7: Human Review ---
+from src.ui_helpers import display_with_gradio
+
+
+def human_review_node(state: AgentState) -> AgentState:
+    """Human review of the generated business glossary using Gradio."""
+
+    print("\n" + "=" * 100)
+    print("HUMAN REVIEW REQUIRED".center(100))
+    print("=" * 100)
+
+    # Get the generated content
+    generated_content = state.get('result', [])
+
+    # Summary statistics
+    total_entries = len(generated_content)
+    print(f"\nTotal entries: {total_entries}")
+    print("\nOpening Gradio interface for review. Please make your selections there...")
+
+    # Launch Gradio interface for review
+    result = display_with_gradio(generated_content)
+
+    # Process the result based on action type
+    if "result" in result:
+        # Directly using modified results from Gradio
+        print("\n✅ Applied modifications directly from Gradio interface")
+
+        # Convert the dict results back to ColumnDef objects
+        from src.state import ColumnDef
+        updated_columns = []
+        for col_dict in result["result"]:
+            updated_columns.append(ColumnDef(**col_dict))
+
+        return {
+            "result": updated_columns,
+            "human_approved": True,
+            "human_feedback": None,  # Clear feedback since we're approving
+            "human_review_history": result.get("human_review_history", ["Modified directly in Gradio interface"])
+        }
+
+    elif result.get("human_approved", False):
+        # User approved all entries
+        print("\n✅ All entries approved.")
+        return {
+            "human_approved": True,
+            "human_feedback": None,  # Clear feedback
+            "human_review_history": result.get("human_review_history", ["Human reviewer approved all entries"])
+        }
+
+    else:
+        # User requested regeneration
+        feedback = result.get("human_feedback", "Please review and improve the business glossary entries")
+        print(f"\n⟳ Requesting regeneration with feedback: {feedback}")
+        print("The generator will create new content based on your feedback.")
+
+        # Reset iterations counter to avoid hitting max too soon
+        current_iterations = state.get('iterations', 0)
+
+        return {
+            "human_approved": False,
+            "human_feedback": feedback,  # Set feedback for generator
+            "error_message": None,  # Clear error message
+            "iterations": max(0, current_iterations - 1),  # Give it more attempts
+            "human_review_history": result.get("human_review_history",
+                                               [f"Human reviewer requested regeneration: {feedback}"])
+        }

@@ -6,19 +6,40 @@ from src.nodes import (
     fill_master_data_steward_node_and_rag_filter,
     rag_retrieval_node,
     generator_node,
-    validator_node
+    validator_node,
+    human_review_node
 )
 from functools import partial
 from pathlib import Path
 
-def router(state: AgentState):
-    """Determines next step based on validation results."""
-    if state["error_message"] == "none":
+
+def should_continue_generating(state: AgentState) -> str:
+    """Simple decision function for after validation."""
+    error_message = state.get("error_message", "none")
+    iterations = state.get("iterations", 0)
+
+    if error_message == "none":
+        print("✅ Validation passed, going to human review")
+        return "human_review"
+    elif iterations >= 3:
+        print("⚠️ Max iterations reached, going to human review anyway")
+        return "human_review"
+    else:
+        print(f"❌ Validation failed (iteration {iterations}), regenerating")
+        return "generate"
+
+
+def human_review_decision(state: AgentState) -> str:
+    """Simple decision function for after human review."""
+    human_approved = state.get("human_approved", False)
+
+    if human_approved:
+        print("✅ Human approved, ending workflow")
         return "end"
-    if state["iterations"] >= 3:
-        print("!!! Max attempts reached. Ending with current result.")
-        return "end"
-    return "generate"
+    else:
+        print("⟳ Human requested regeneration, going back to generator")
+        return "generate"
+
 
 def build_graph(project_root: Path):
     """Constructs and compiles the StateGraph."""
@@ -33,24 +54,34 @@ def build_graph(project_root: Path):
     workflow.add_node("RAG_retrieve", rag_node_with_path)
     workflow.add_node("generate", generator_node)
     workflow.add_node("validate", validator_node)
+    workflow.add_node("human_review", human_review_node)
 
     # Set Entry Point
     workflow.set_entry_point("prepare_template")
 
-    # Add Edges
+    # Add Edges - strict linear flow for initial steps
     workflow.add_edge("prepare_template", "fill_master_business_glossary")
     workflow.add_edge("fill_master_business_glossary", "fill_master_data_steward")
     workflow.add_edge("fill_master_data_steward", "RAG_retrieve")
     workflow.add_edge("RAG_retrieve", "generate")
-    workflow.add_edge("generate", "validate")
+    workflow.add_edge("generate", "validate")  # Always validate after generating
 
-    # Add Conditional Edges
+    # Add Conditional Edges for decision points
     workflow.add_conditional_edges(
         "validate",
-        router,
+        should_continue_generating,
         {
-            "generate": "generate",
-            "end": END
+            "human_review": "human_review",
+            "generate": "generate"
+        }
+    )
+
+    workflow.add_conditional_edges(
+        "human_review",
+        human_review_decision,
+        {
+            "end": END,
+            "generate": "generate"
         }
     )
 

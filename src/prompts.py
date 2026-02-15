@@ -42,6 +42,8 @@ For every field marked `<agent>`, apply the following logic:
 - The number of objects in your output `result` list must exactly match the number of columns in the input.
 
 {critic_feedback}
+
+{human_feedback}
 """
 
 GENERATOR_PROMPT = ChatPromptTemplate.from_messages([

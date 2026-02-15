@@ -67,3 +67,14 @@ class AgentState(TypedDict, total=False):
     error_message: str
     iterations: int
     review_history_validator: Annotated[List[str], operator.add]
+
+    # Outputs & Control Flow
+    result: List[ColumnDef]
+    error_message: str
+    iterations: int
+    review_history_validator: Annotated[List[str], operator.add]
+
+    # Human-in-the-loop fields
+    human_approved: bool
+    human_feedback: str
+    human_review_history: Annotated[List[str], operator.add]
