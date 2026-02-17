@@ -13,6 +13,7 @@ from pathlib import Path
 
 def router(state: AgentState):
     """Determines next step based on validation results."""
+    print(f"ROUTER: iterations = {state.get('iterations', 0)}, error_message = {state.get('error_message', '')}")
     if state["error_message"] == "none":
         return "end"
     if state["iterations"] >= 3:
