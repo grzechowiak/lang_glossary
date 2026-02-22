@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import List
 import shutil
+from pathlib import Path
+import pandas as pd
 
 from langchain_core.documents import Document
 from langchain_community.document_loaders import Docx2txtLoader
@@ -10,6 +12,8 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 
 from rag.config_rag import RAGConfig
+from datetime import datetime
+timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 
 
 class DBIndexer:
@@ -21,30 +25,53 @@ class DBIndexer:
     def __init__(self, cfg: RAGConfig):
         self.cfg = cfg
 
+    @staticmethod
+    def _load_docx(path: Path) -> List[Document]:
+        loaded = Docx2txtLoader(str(path)).load()
+        for d in loaded:
+            d.metadata.update({"source": str(path), "file_type": "docx"})
+        return loaded
+
+    @staticmethod
+    def _load_csv(path: Path) -> List[Document]:
+        df = pd.read_csv(path, delimiter=';')
+        return [
+            Document(
+                page_content=df.to_csv(index=False),
+                metadata={
+                    "source": str(path),
+                    "file_type": "csv",
+                },
+            )
+        ]
+
     def load_documents(self) -> List[Document]:
-        """Load all .docx files from the configured docs directory"""
         docs: List[Document] = []
 
-        # Ensure docs directory exists
-        if not self.cfg.docs_dir.exists():
-            raise FileNotFoundError(
-                f"Documents directory not found: {self.cfg.docs_dir}\n"
-                f"Please create it or check your project_root setting."
-            )
+        sources = {
+            self.cfg.docs_dir: {".docx": self._load_docx},
+            self.cfg.excel_dir: {".csv": self._load_csv},  # using same folder for csv
+        }
 
-        # Load all .docx files
-        docx_files = list(self.cfg.docs_dir.rglob("*.docx"))
-        if not docx_files:
+        for folder in sources:
+            if not folder.exists():
+                raise FileNotFoundError(f"Source directory not found: {folder}")
+
+        file_count = 0
+        for folder, handlers in sources.items():
+            for ext, loader_fn in handlers.items():
+                files = list(folder.rglob(f"*{ext}"))
+                file_count += len(files)
+                print(f"Found {len(files)} {ext} file(s) in {folder}")
+                for path in files:
+                    docs.extend(loader_fn(path))
+
+        if file_count == 0:
             raise ValueError(
-                f"No .docx files found in {self.cfg.docs_dir}\n"
-                f"Please add documents to index."
+                f"No supported files found in:\n"
+                f"- {self.cfg.docs_dir}\n"
+                f"- {self.cfg.excel_dir}"
             )
-
-        print(f"Found {len(docx_files)} .docx file(s) in {self.cfg.docs_dir}")
-
-        for path in docx_files:
-            loader = Docx2txtLoader(str(path))
-            docs.extend(loader.load())
 
         return docs
 
@@ -75,7 +102,11 @@ class DBIndexer:
         # Load and split documents
         print("Loading documents...")
         docs = self.load_documents()
-        print(f"Loaded {len(docs)} document(s)")
+        by_type = {}
+        for d in docs:
+            t = d.metadata.get("file_type", "unknown")
+            by_type[t] = by_type.get(t, 0) + 1
+        print(f"Loaded {len(docs)} document(s): {by_type}")
 
         print("Splitting into chunks...")
         chunks = self.split_documents(docs)
@@ -92,6 +123,7 @@ class DBIndexer:
             embedding=embedding,
             persist_directory=str(self.cfg.persist_dir),
             collection_name=self.cfg.collection_name,
+            collection_metadata={"created_at": timestamp},
         )
 
         # Sanity check
