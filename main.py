@@ -58,17 +58,13 @@ def main():
         print(f"\n Error loading data: {e}")
         return 1
 
-
     # 3. Validate if files contains columns which are expected
     bg_masters_columns = cfg_datasets.column_mappings_master_bg
     ds_master_columns = cfg_datasets.column_mappings_master_data_owners
     validate_expected_columns_in_masters(bg_dict, bg_masters_columns)
     validate_expected_columns_in_masters(ds_dict, ds_master_columns)
 
-    # replace all namings to internal
-
-
-    # 3. Setup initial state
+    # 4. Setup initial state
     initial_state = {
         "framework_def": cfg_datasets.get_framework_dict(),
         "source_original_table": sample_dict,
@@ -84,7 +80,7 @@ def main():
         "review_history_validator": []
     }
 
-    # 4. Run workflow
+    # 5. Run workflow
     print("\n" + "=" * 60)
     print("STARTING WORKFLOW")
     print("=" * 60 + "\n")
@@ -97,29 +93,33 @@ def main():
         print(f"\n Workflow failed: {e}")
         return 1
 
-    # 5. Save results
+    # 6. Save results
     if not final_output or 'result' not in final_output or not final_output['result']:
         print("\n No results generated")
         return 1
 
     df_result = pd.DataFrame([c.model_dump() for c in final_output['result']])
+    context_txt = final_output['RAG_company_context']
 
     # Create output directory
     cfg_paths.output_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate filename
-    if cfg_paths.include_timestamp:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"{cfg_paths.output_filename_prefix}_{timestamp}.csv"
-    else:
-        filename = f"{cfg_paths.output_filename_prefix}.csv"
+    # if cfg_paths.include_timestamp:
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"{timestamp}_{cfg_paths.output_filename_suffix}.csv"
+    filename_context_rag = f"{timestamp}_{cfg_paths.output_filename_suffix_context_rag}.txt"
+    # else:
+    #     filename = f"{cfg_paths.output_filename_prefix}.csv"
 
     output_file = cfg_paths.output_dir / filename
+    output_file2 = cfg_paths.output_dir / filename_context_rag
 
     # Save
-    df_result.to_csv(output_file, index=False, sep=cfg_paths.csv_separator)
+    df_result.to_csv(output_file, index=False, sep=cfg_paths.csv_separator) # final table
+    output_file2.write_text(context_txt, encoding="utf-8") # context
 
-    # 6. Display results
+    # 7. Display results
     print("\n ✅ Agents Finished!")
     print(f"\n📝 Saved to: {output_file}")
     print(f"Columns processed: {len(df_result)}")
@@ -132,7 +132,6 @@ def main():
     print("-" * 60)
 
     return 0
-
 
 if __name__ == "__main__":
     exit(main())

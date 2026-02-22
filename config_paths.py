@@ -22,7 +22,8 @@ class ConfigPaths:
         self.data_stewards = self.data_dir / "stewards_and_owners" / "data_stewards.csv"
 
         # Output settings
-        self.output_filename_prefix = "BG_TEST_v1"
+        self.output_filename_suffix_context_rag = "BG_CONTEXT"
+        self.output_filename_suffix = "BG_FINAL_TABLE"
         self.include_timestamp = True
 
         # CSV settings
