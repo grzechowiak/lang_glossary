@@ -1,110 +1,91 @@
 import pandas as pd
-from config_paths import Config#, BigQueryConfig
+from config_paths import ConfigPaths#, BigQueryConfig
+from config_datasets import ConfigDatasets
+
+def validate_expected_columns_in_masters(
+    dict_loaded: dict,
+    dict_expected: dict
+) -> bool:
+    """
+    Checks if loaded columns exactly match expected columns.
+
+    Raises:
+        ValueError: If columns are missing or unexpected.
+    Returns:
+        True if validation passes
+    """
+
+    loaded_cols = set(dict_loaded.keys())
+    expected_cols = set(dict_expected.values())
+
+    missing_columns = expected_cols - loaded_cols
+    unexpected_columns = loaded_cols - expected_cols
+
+    errors = []
+
+    if missing_columns:
+        errors.append(
+            f"Missing expected columns: {', '.join(sorted(missing_columns))}"
+        )
+
+    if unexpected_columns:
+        errors.append(
+            f"Unexpected columns in file: {', '.join(sorted(unexpected_columns))}"
+        )
+
+    if errors:
+        raise ValueError("\n".join(errors))
+
+    return True
 
 
-def load_csv_data(config: Config):
+def load_csv_data(config: ConfigPaths, config_datasets: ConfigDatasets):
     """
     Load data from CSV files.
 
     Args:
         config: Configuration object with file paths
+        config_datasets : Configuration for the datasets structure and naming
 
     Returns:
         Tuple of (original_sample_dict, bg_glossary_dict, ds_master_dict)
     """
     print("⏳ Loading data from CSV files...")
 
-    # Load main dataset
+    ### 1. Load main dataset
     df_main = pd.read_csv(config.main_dataset, sep=config.csv_separator)
     df_sample = df_main.head(3) ## <---- define how rows will have the sample data on input
     original_sample_dict = df_sample.to_dict(orient='list')
     print(f"✅ Loaded sample dataset: {len(df_main)} rows")
 
-    # Load master business glossary
+    ### 2. Load master business glossary & rename columns
     df_glossary = pd.read_csv(config.master_glossary, sep=config.csv_separator)
 
     # Drop unwanted columns
-    cols_to_drop = [col for col in config.columns_to_drop if col in df_glossary.columns]
-    if cols_to_drop:
-        df_glossary.drop(columns=cols_to_drop, inplace=True)
-
+    # cols_to_drop = [col for col in config_datasets.columns_to_drop if col in df_glossary.columns]
+    # if cols_to_drop:
+    #     df_glossary.drop(columns=cols_to_drop, inplace=True)
+    df_glossary = df_glossary.rename(columns=config_datasets.column_mappings_master_bg)
     bg_glossary_dict = df_glossary.to_dict(orient='list')
     print(f"✅ Loaded master glossary: {len(df_glossary)} rows")
 
-    # Load data stewards
+    ### 3. Load data stewards & rename columns
     df_stewards = pd.read_csv(config.data_stewards, sep=config.csv_separator)
+    df_stewards = df_stewards.rename(columns=config_datasets.column_mappings_master_data_owners)
     ds_master_dict = df_stewards.to_dict(orient='list')
     print(f"✅ Loaded data stewards: {len(df_stewards)} rows")
 
     return original_sample_dict, bg_glossary_dict, ds_master_dict
 
 
-# def load_bigquery_data(config: BigQueryConfig):
-#     """
-#     Load data from BigQuery.
-#     Use this when you migrate to GCP.
-#
-#     Args:
-#         config: BigQuery configuration object
-#
-#     Returns:
-#         Tuple of (original_sample_dict, bg_glossary_dict, ds_master_dict)
-#     """
-#     print("Loading data from BigQuery...")
-#
-#     try:
-#         from google.cloud import bigquery
-#
-#         client = bigquery.Client(project=config.bq_project_id)
-#
-#         # Query main dataset (sample 3 rows)
-#         query_main = f"""
-#             SELECT *
-#             FROM `{config.bq_project_id}.{config.bq_dataset}.{config.bq_main_table}`
-#             LIMIT 3
-#         """
-#         df_main = client.query(query_main).to_dataframe()
-#         print(f"✓ Loaded main dataset: {len(df_main)} rows")
-#
-#         # Query master glossary (exclude certain columns)
-#         cols_to_exclude = ", ".join(config.columns_to_drop)
-#         query_glossary = f"""
-#             SELECT * EXCEPT ({cols_to_exclude})
-#             FROM `{config.bq_project_id}.{config.bq_dataset}.{config.bq_glossary_table}`
-#         """
-#         df_glossary = client.query(query_glossary).to_dataframe()
-#         print(f"✓ Loaded master glossary: {len(df_glossary)} rows")
-#
-#         # Query data stewards
-#         query_stewards = f"""
-#             SELECT *
-#             FROM `{config.bq_project_id}.{config.bq_dataset}.{config.bq_stewards_table}`
-#         """
-#         df_stewards = client.query(query_stewards).to_dataframe()
-#         print(f"✓ Loaded data stewards: {len(df_stewards)} rows")
-#
-#         return (
-#             df_main.to_dict(orient='list'),
-#             df_glossary.to_dict(orient='list'),
-#             df_stewards.to_dict(orient='list')
-#         )
-#
-#     except ImportError:
-#         print("Error: google-cloud-bigquery not installed")
-#         print("   Install with: pip install google-cloud-bigquery")
-#         raise
-#     except Exception as e:
-#         print(f"Error loading from BigQuery: {e}")
-#         raise
-
-
-def load_data(config: Config):
+def load_data(config: ConfigPaths, config_datasets: ConfigDatasets):
     """
     Load data based on config type.
     Simple router function.
 
     Args:
         config: Either Config or BigQueryConfig
+        config_datasets : Configuration for the datasets structure and naming
 
     Returns:
         Tuple of (original_sample_dict, bg_glossary_dict, ds_master_dict)
@@ -112,4 +93,4 @@ def load_data(config: Config):
     # if isinstance(config, BigQueryConfig) and config.use_bigquery:
     #     return load_bigquery_data(config)
     # else:
-    return load_csv_data(config)
+    return load_csv_data(config, config_datasets)

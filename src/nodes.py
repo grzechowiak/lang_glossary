@@ -8,15 +8,18 @@ from src.state import AgentState, TemplateOutput, ValidationResult
 from rag.config_rag import RAGConfig
 from rag.retriever_formatting import PrepareRetrieval
 from utils.helpers import template_enricher
-from config_paths import Config
+# from config_paths import ConfigPaths
+from config_agent import ConfigAgents
 from src.prompts import GENERATOR_PROMPT, VALIDATOR_PROMPT
-
-config = Config()
+from config_datasets import ConfigDatasets
 
 # --- LLM Setup ---
-gpt_model = config.llm_model
-llm = ChatOpenAI(model=gpt_model, temperature=0)
+# config = ConfigPaths()
+cfg_agent = ConfigAgents()
+gpt_model = cfg_agent.llm_model
+cfg_dataset = ConfigDatasets()
 
+llm = ChatOpenAI(model=gpt_model, temperature=0)
 structured_llm = llm.with_structured_output(TemplateOutput)
 critic_llm = llm.with_structured_output(ValidationResult)
 
@@ -26,29 +29,37 @@ def prepare_template_node(state: AgentState) -> AgentState:
     """Prepare the Business Glossary template skeleton from the sampled dataset."""
     print("⏳ Fetching the template...")
 
-    framework_def = state.get("framework_def")
-    original_sample_dict = state.get("source_original_table")
+    original_sample_dict = state["source_original_table"]
 
-    # Build the Framework
-    df_template_v0 = pd.DataFrame(original_sample_dict)
-    df_template_v1 = pd.DataFrame({
-        "Table Name": framework_def['table_name_value'],
-        "Column Name": df_template_v0.columns,
-        "Sample Values": [df_template_v0[col].tolist() for col in df_template_v0.columns],
-    })
+    df_template = cfg_dataset.build_template(original_sample_dict)
 
-    # Fill RAG columns with placeholder
-    for c in framework_def['search_with_RAG']:
-        df_template_v1[c] = "<agent>"
+    return {"template_df": df_template.to_dict(orient="list")}
 
-    # Fill data steward file columns with placeholder
-    for c in framework_def['search_with_data_steward_file']:
-        df_template_v1[c] = "<ds_master>"
-
-    print("✅ Template is ready! Following structure will be filled in the next steps:")
-    print(df_template_v1.head(5))
-
-    return {"template_df": df_template_v1.to_dict(orient='list')}
+    # framework_def = state.get("framework_def")
+    # original_sample_dict = state.get("source_original_table")
+    #
+    # # Build the Framework
+    # df_template_v0 = pd.DataFrame(original_sample_dict)
+    # df_template_v1 = pd.DataFrame({
+    #     "bucket_name": framework_def['bucket_name'],
+    #     "dataset_name": framework_def['dataset_name'] ,
+    #     "table_name": framework_def['table_name_value'],
+    #     "column_name": df_template_v0.columns,
+    #     "sample_values": [df_template_v0[col].tolist() for col in df_template_v0.columns],
+    # })
+    #
+    # # Fill RAG columns with placeholder
+    # for c in framework_def['search_with_RAG']:
+    #     df_template_v1[c] = "<agent>"
+    #
+    # # Fill data steward file columns with placeholder
+    # for c in framework_def['search_with_data_steward_file']:
+    #     df_template_v1[c] = "<ds_master>"
+    #
+    # print("✅ Template is ready! Following structure will be filled in the next steps:")
+    # print(df_template_v1.head(5))
+    #
+    # return {"template_df": df_template_v1.to_dict(orient='list')}
 
 
 # --- NODE 2: Fill Master Business Glossary ---
@@ -65,7 +76,7 @@ def fill_master_business_glossary_node(state: AgentState) -> AgentState:
     df_template_updated = template_enricher(
         template_df=df_template,
         enrich_df=df_bg_glossary,
-        join_keys=["Table Name", "Column Name"],
+        join_keys=["bucket_name", "dataset_name", 'table_name', 'column_name'],
         fill_cols=fill_cols,
     )
 
@@ -88,7 +99,7 @@ def fill_master_data_steward_node_and_rag_filter(state: AgentState) -> AgentStat
     df_template_updated = template_enricher(
         template_df=df_template,
         enrich_df=df_do_master,
-        join_keys=["Table Name"],
+        join_keys=["bucket_name", "dataset_name", 'table_name'], # stewards are joined on table level
         fill_cols=fill_cols,
     )
 
@@ -110,7 +121,7 @@ def fill_master_data_steward_node_and_rag_filter(state: AgentState) -> AgentStat
 
     ## Below object will be used to perform RAG searches (column name + sample values,
     # e.g. Account_number: [12345, 67890, 111213])
-    dict_for_RAG_search = dict(zip(df_missing["Column Name"], df_missing["Sample Values"]))
+    dict_for_RAG_search = dict(zip(df_missing["column_name"], df_missing["sample_values"]))
 
     return {
         "template_df": full_dict, # in fact doesn't need to be retrieved but returned as updated object for clarity
@@ -125,7 +136,6 @@ def rag_retrieval_node(state: AgentState, project_root: Path) -> AgentState:
     col_samples = state.get("RAG_cols_with_samples")
 
     # Initialize RAG (assuming paths are relative to root where script is run)
-    # basic_path = Path.cwd()
     cfg = RAGConfig(project_root=project_root)
     prep = PrepareRetrieval(cfg)
 
@@ -199,6 +209,7 @@ def validator_node(state: AgentState):
 
     review = critic_llm.invoke(formatted_messages)
 
+    # if false (i.e. not valid)
     if not review.is_valid:
         print(f"--- CRITIC FEEDBACK: {review.feedback} ---")
         return {
