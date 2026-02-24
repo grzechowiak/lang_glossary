@@ -1,6 +1,6 @@
 import pandas as pd
-from config_paths import ConfigPaths#, BigQueryConfig
-from config_datasets import ConfigDatasets
+from configs.config_paths import ConfigPaths#, BigQueryConfig
+from configs.config_datasets import ConfigDatasets
 
 def validate_expected_columns_in_masters(
     dict_loaded: dict,

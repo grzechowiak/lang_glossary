@@ -1,5 +1,8 @@
 import pandas as pd
 from typing import Iterable, List, Dict
+from pydantic import BaseModel
+from typing import Type
+from datetime import datetime
 
 
 def template_enricher(
@@ -61,6 +64,49 @@ def template_enricher(
     return merged
 
 
+def check_columns_with_pydantic(df: pd.DataFrame, schema: Type[BaseModel]) -> bool:
+    """
+    Raises ValueError if DataFrame columns are not exactly the same set
+    as the Pydantic model fields (missing or extra columns).
+    """
+    expected = set(schema.model_fields.keys())
+    actual = set(df.columns)
+
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+
+    if missing or extra:
+        raise ValueError(
+            f"DataFrame columns do not match schema {schema.__name__}.\n"
+            f"Missing: {missing}\n"
+            f"Extra:   {extra}"
+        )
+    return True
+
+
+
+def save_outputs(df_result, context_text, table_summary_text, cfg_paths):
+    """
+    Saving the final results of the Agent into separate files along with
+    the timestamp
+    """
+
+    cfg_paths.output_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    files = {
+        "csv": cfg_paths.output_dir / f"{timestamp}_{cfg_paths.output_filename_suffix_final_table}.csv",
+        "context": cfg_paths.output_dir / f"{timestamp}_{cfg_paths.output_filename_suffix_context_rag}.txt",
+        "summary": cfg_paths.output_dir / f"{timestamp}_{cfg_paths.output_filename_suffix_table_summary}.txt",
+    }
+
+    # Save files
+    df_result.to_csv(files["csv"], index=False, sep=cfg_paths.csv_separator)
+    files["context"].write_text(context_text, encoding="utf-8")
+    files["summary"].write_text(table_summary_text, encoding="utf-8")
+
+    return files
 
 # def df_to_dict(df: pd.DataFrame) -> Dict[str, List[str]]:
 #     """

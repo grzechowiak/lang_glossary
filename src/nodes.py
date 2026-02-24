@@ -9,9 +9,11 @@ from rag.config_rag import RAGConfig
 from rag.retriever_formatting import PrepareRetrieval
 from utils.helpers import template_enricher
 # from config_paths import ConfigPaths
-from config_agent import ConfigAgents
+from configs.config_agent import ConfigAgents
 from src.prompts import GENERATOR_PROMPT, VALIDATOR_PROMPT
-from config_datasets import ConfigDatasets
+from configs.config_datasets import ConfigDatasets
+from src.state import ColumnDefInput
+from utils.helpers import check_columns_with_pydantic
 
 # --- LLM Setup ---
 # config = ConfigPaths()
@@ -32,6 +34,9 @@ def prepare_template_node(state: AgentState) -> AgentState:
     original_sample_dict = state["source_original_table"]
 
     df_template = cfg_dataset.build_template(original_sample_dict)
+
+    # Check if the template you built matches the Pydantic schema the Agent expects
+    check_columns_with_pydantic(df_template, ColumnDefInput)
 
     return {"template_df": df_template.to_dict(orient="list")}
 
@@ -136,8 +141,8 @@ def rag_retrieval_node(state: AgentState, project_root: Path) -> AgentState:
     col_samples = state.get("RAG_cols_with_samples")
 
     # Initialize RAG (assuming paths are relative to root where script is run)
-    cfg = RAGConfig(project_root=project_root)
-    prep = PrepareRetrieval(cfg)
+    cfg_rag = RAGConfig(project_root=project_root)
+    prep = PrepareRetrieval(cfg_rag)
 
     results = prep.retrieve_for_all_columns(col_samples)
     company_context_prompt = prep.build_prompt_and_format(results)
@@ -169,7 +174,7 @@ def generator_node(state: AgentState):
 
     response = structured_llm.invoke(formatted_messages)
     return {
-        "result": response.columns,
+        "result": response,
         "iterations": state['iterations'] + 1
     }
 
@@ -180,19 +185,28 @@ def validator_node(state: AgentState):
 
     print("--- CRITIC: Reviewing... ---")
 
-    # Calculate counts to check for data loss
-    input_table = state.get('entire_table_context', {})
-    expected_count = len(input_table.get('Column Name', []))
-    actual_count = len(state['result'])
+    model_generation = state['result']
+    model_generation_rows = model_generation.rows
+    model_generation_summary = model_generation.table_summary
 
-    current_work = "\n".join([
-        f"Column: {c.column_name}\n"
-        f"Proposed Description: {c.column_description}\n"
-        f"Source Used: {c.extra__add_source_explained}\n"
-        f"Evidence/Logic: {c.extra__add_citation_of_the_hit}\n"
-        "---"
-        for c in state['result']
-    ])
+    # Calculate counts to make sure the generator did not lose any row
+    input_table = state.get('entire_table_context', {})
+    expected_rows_count = len(list(input_table.values())[0]) # get number of rows from 1st column in the input table
+    generator_rows_count = len(model_generation_rows) # get number of rows
+    # create a message if there is no match
+    if True:
+        if expected_rows_count != generator_rows_count:
+            mismatch_message = (
+                f"we have row count mismatch: expected {expected_rows_count}, "
+                f"but generated {generator_rows_count}."
+                f'Set is_valid = False and state "Missing columns in output".'
+            )
+        else:
+            mismatch_message = " it is great, row count matches expected number."
+
+    # Format the current work of the Generator
+    current_work = [{"row_number": i + 1, **c.model_dump()}
+                    for i, c in enumerate(model_generation_rows)]
 
     # Bring context from state
     rag_company_context = state.get('RAG_company_context', "No additional context provided.")
@@ -203,13 +217,13 @@ def validator_node(state: AgentState):
         rag_company_context=rag_company_context,
         full_table_context=full_table_context,
         current_work=current_work,
-        expected_count=expected_count,
-        actual_count=actual_count
+        current_work_table_summary = model_generation_summary,
+        mismatch_message=mismatch_message
     )
 
     review = critic_llm.invoke(formatted_messages)
 
-    # if false (i.e. not valid)
+    # if false (i.e. not valid):
     if not review.is_valid:
         print(f"--- CRITIC FEEDBACK: {review.feedback} ---")
         return {
@@ -217,6 +231,7 @@ def validator_node(state: AgentState):
             "review_history_validator": [f"Step {state['iterations']} Critic: {review.feedback}"]
         }
 
+    # if all good and no feedback:
     return {
         "error_message": "none",
         "review_history_validator": [f"Critique (Passed): {review.feedback}"]

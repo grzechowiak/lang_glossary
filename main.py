@@ -11,21 +11,20 @@ if not os.environ.get("OPENAI_API_KEY"):
     print("Error: OPENAI_API_KEY not found")
     exit(1)
 
-# Import simple config and loader
-from config_paths import ConfigPaths
-from data_loader import load_data
+# Import loaders / helpers
+from utils.data_loader import load_data
+from utils.data_loader import validate_expected_columns_in_masters
+from utils.helpers import save_outputs
 
 # Import the graph builder
 from src.graph import build_graph
 
-# Import RAG config
+# Import Configs
+from configs.config_paths import ConfigPaths
 from rag.config_rag import RAGConfig
-
-from config_datasets import ConfigDatasets
-from data_loader import validate_expected_columns_in_masters
-
-from config_agent import ConfigAgents
-
+from configs.config_datasets import ConfigDatasets
+from configs.config_agent import ConfigAgents
+from src.state import TemplateOutput
 
 def main():
     """Main execution flow - simple and clean."""
@@ -98,30 +97,36 @@ def main():
         print("\n No results generated")
         return 1
 
-    df_result = pd.DataFrame([c.model_dump() for c in final_output['result']])
+    # Unpack results
+    result_fetch: TemplateOutput = final_output["result"]
+    df_result = pd.DataFrame([c.model_dump() for c in result_fetch.rows])
     context_txt = final_output['RAG_company_context']
-
-    # Create output directory
-    cfg_paths.output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Generate filename
-    # if cfg_paths.include_timestamp:
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"{timestamp}_{cfg_paths.output_filename_suffix}.csv"
-    filename_context_rag = f"{timestamp}_{cfg_paths.output_filename_suffix_context_rag}.txt"
-    # else:
-    #     filename = f"{cfg_paths.output_filename_prefix}.csv"
-
-    output_file = cfg_paths.output_dir / filename
-    output_file2 = cfg_paths.output_dir / filename_context_rag
+    df_table_summary = result_fetch.table_summary
 
     # Save
-    df_result.to_csv(output_file, index=False, sep=cfg_paths.csv_separator) # final table
-    output_file2.write_text(context_txt, encoding="utf-8") # context
+    save_outputs(df_result = df_result,
+                 context_text = context_txt,
+                 table_summary_text = df_table_summary,
+                 cfg_paths = cfg_paths)
+
+    # # Generate filename
+    # timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # filename = f"{timestamp}_{cfg_paths.output_filename_suffix}.csv"
+    # filename_context_rag = f"{timestamp}_{cfg_paths.output_filename_suffix_context_rag}.txt"
+    # filename_table_summary = f"{timestamp}_{cfg_paths.output_filename_suffix_table_summary}.txt"
+    #
+    # output_file = cfg_paths.output_dir / filename
+    # output_file2 = cfg_paths.output_dir / filename_context_rag
+    # output_file3 = cfg_paths.output_dir / filename_table_summary
+    #
+    # # Save
+    # df_result.to_csv(output_file, index=False, sep=cfg_paths.csv_separator) # final table
+    # output_file2.write_text(context_txt, encoding="utf-8") # context
+    # output_file3.write_text(df_table_summary, encoding="utf-8")  # table_summary
 
     # 7. Display results
     print("\n ✅ Agents Finished!")
-    print(f"\n📝 Saved to: {output_file}")
+    print(f"\n📝 Saved to: {cfg_paths.output_dir}")
     print(f"Columns processed: {len(df_result)}")
     print(f"Iterations: {final_output.get('iterations', 0)}")
 

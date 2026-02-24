@@ -23,7 +23,8 @@ class ConfigPaths:
 
         # Output settings
         self.output_filename_suffix_context_rag = "BG_CONTEXT"
-        self.output_filename_suffix = "BG_FINAL_TABLE"
+        self.output_filename_suffix_table_summary = "BG_TABLE_SUMMARY"
+        self.output_filename_suffix_final_table = "BG_FINAL_TABLE"
         self.include_timestamp = True
 
         # CSV settings
