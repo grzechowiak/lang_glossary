@@ -11,34 +11,20 @@ if not os.environ.get("OPENAI_API_KEY"):
     print("Error: OPENAI_API_KEY not found")
     exit(1)
 
-# def get_masked_key(variable_name):
-#     key = os.getenv(variable_name)
-#     if not key:
-#         return None
-#     # Show first 4 and last 4 characters, mask the middle
-#     if len(key) > 8:
-#         return f"{key[:4]}{'*' * 8}{key[-4:]}"
-#     return "****" # Fallback if key is strangely short
-#
-# # 2. Validation and verification
-# api_key = os.getenv("OPENAI_API_KEY")
-#
-# if not api_key:
-#     print("❌ Error: OPENAI_API_KEY not found in environment.")
-#     exit(1)
-# else:
-#     print(f"✅ API Key loaded: {get_masked_key('OPENAI_API_KEY')}")
-
-# Import simple config and loader
-from config_paths import Config
-from data_loader import load_data
+# Import loaders / helpers
+from utils.data_loader import load_data
+from utils.data_loader import validate_expected_columns_in_masters
+from utils.helpers import save_outputs
 
 # Import the graph builder
 from src.graph import build_graph
 
-# Import RAG config
+# Import Configs
+from configs.config_paths import ConfigPaths
 from rag.config_rag import RAGConfig
-
+from configs.config_datasets import ConfigDatasets
+from configs.config_agent import ConfigAgents
+from src.state import TemplateOutput
 
 def main():
     """Main execution flow - simple and clean."""
@@ -48,36 +34,38 @@ def main():
     print("=" * 60)
 
     # 1. Setup configuration
-    config = Config()
-    rag_default_config = RAGConfig(project_root=config.project_root)
+    cfg_paths = ConfigPaths()
+    cfg_rag = RAGConfig(project_root=cfg_paths.project_root)
+    cfg_datasets = ConfigDatasets()
+    cfg_agents = ConfigAgents()
 
-    # For BigQuery, use this instead:
-    # from config_agent import BigQueryConfig
-    # config = BigQueryConfig(project_root=Path.cwd())
-    # config.bq_project_id = "your-project"
-    # config.bq_dataset = "your-dataset"
-
-    print(f"\nProject root: {config.project_root}")
-    print(f"Embedding model: {rag_default_config.embedding_model}")
-    print(f"LLM model: {config.llm_model}\n")
+    print(f"\nProject root: {cfg_paths.project_root}")
+    print(f"Embedding model: {cfg_rag.embedding_model}")
+    print(f"LLM model: {cfg_agents.llm_model}\n")
 
     # 2. Load data
     try:
-        sample_dict, bg_dict, ds_dict = load_data(config)
+        sample_dict, bg_dict, ds_dict = load_data(cfg_paths, cfg_datasets)
     except FileNotFoundError as e:
         print(f"\n Error: {e}")
         print("\nMake sure these files exist:")
-        print(f"  - {config.main_dataset}")
-        print(f"  - {config.master_glossary}")
-        print(f"  - {config.data_stewards}")
+        print(f"  - {cfg_paths.main_dataset}")
+        print(f"  - {cfg_paths.master_glossary}")
+        print(f"  - {cfg_paths.data_stewards}")
         return 1
     except Exception as e:
         print(f"\n Error loading data: {e}")
         return 1
 
-    # 3. Setup initial state
+    # 3. Validate if files contains columns which are expected
+    bg_masters_columns = cfg_datasets.column_mappings_master_bg
+    ds_master_columns = cfg_datasets.column_mappings_master_data_owners
+    validate_expected_columns_in_masters(bg_dict, bg_masters_columns)
+    validate_expected_columns_in_masters(ds_dict, ds_master_columns)
+
+    # 4. Setup initial state
     initial_state = {
-        "framework_def": config.get_framework_dict(),
+        "framework_def": cfg_datasets.get_framework_dict(),
         "source_original_table": sample_dict,
         "master_business_glossary": bg_dict,
         "master_data_owner": ds_dict,
@@ -91,44 +79,39 @@ def main():
         "review_history_validator": []
     }
 
-    # 4. Run workflow
+    # 5. Run workflow
     print("\n" + "=" * 60)
     print("STARTING WORKFLOW")
     print("=" * 60 + "\n")
 
-    app = build_graph(project_root=config.project_root)
+    app = build_graph(project_root=cfg_paths.project_root)
 
     try:
-        final_output = app.invoke(initial_state, {"recursion_limit": config.recursion_limit})
+        final_output = app.invoke(initial_state, {"recursion_limit": cfg_agents.recursion_limit})
     except Exception as e:
         print(f"\n Workflow failed: {e}")
         return 1
 
-    # 5. Save results
+    # 6. Save results
     if not final_output or 'result' not in final_output or not final_output['result']:
         print("\n No results generated")
         return 1
 
-    df_result = pd.DataFrame([c.model_dump() for c in final_output['result']])
-
-    # Create output directory
-    config.output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Generate filename
-    if config.include_timestamp:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"{config.output_filename_prefix}_{timestamp}.csv"
-    else:
-        filename = f"{config.output_filename_prefix}.csv"
-
-    output_file = config.output_dir / filename
+    # Unpack results
+    result_fetch: TemplateOutput = final_output["result"]
+    df_result = pd.DataFrame([c.model_dump() for c in result_fetch.rows])
+    context_txt = final_output['RAG_company_context']
+    df_table_summary = result_fetch.table_summary
 
     # Save
-    df_result.to_csv(output_file, index=False, sep=config.csv_separator)
+    save_outputs(df_result = df_result,
+                 context_text = context_txt,
+                 table_summary_text = df_table_summary,
+                 cfg_paths = cfg_paths)
 
-    # 6. Display results
+    # 7. Display results
     print("\n ✅ Agents Finished!")
-    print(f"\n📝 Saved to: {output_file}")
+    print(f"\n📝 Saved to: {cfg_paths.output_dir}")
     print(f"Columns processed: {len(df_result)}")
     print(f"Iterations: {final_output.get('iterations', 0)}")
 
@@ -139,7 +122,6 @@ def main():
     print("-" * 60)
 
     return 0
-
 
 if __name__ == "__main__":
     exit(main())

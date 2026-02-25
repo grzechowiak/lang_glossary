@@ -8,15 +8,20 @@ from src.state import AgentState, TemplateOutput, ValidationResult
 from rag.config_rag import RAGConfig
 from rag.retriever_formatting import PrepareRetrieval
 from utils.helpers import template_enricher
-from config_paths import Config
+# from config_paths import ConfigPaths
+from configs.config_agent import ConfigAgents
 from src.prompts import GENERATOR_PROMPT, VALIDATOR_PROMPT
-
-config = Config()
+from configs.config_datasets import ConfigDatasets
+from src.state import ColumnDefInput
+from utils.helpers import check_columns_with_pydantic
 
 # --- LLM Setup ---
-gpt_model = config.llm_model
-llm = ChatOpenAI(model=gpt_model, temperature=0)
+# config = ConfigPaths()
+cfg_agent = ConfigAgents()
+gpt_model = cfg_agent.llm_model
+cfg_dataset = ConfigDatasets()
 
+llm = ChatOpenAI(model=gpt_model, temperature=0)
 structured_llm = llm.with_structured_output(TemplateOutput)
 critic_llm = llm.with_structured_output(ValidationResult)
 
@@ -26,29 +31,14 @@ def prepare_template_node(state: AgentState) -> AgentState:
     """Prepare the Business Glossary template skeleton from the sampled dataset."""
     print("⏳ Fetching the template...")
 
-    framework_def = state.get("framework_def")
-    original_sample_dict = state.get("source_original_table")
+    original_sample_dict = state["source_original_table"]
 
-    # Build the Framework
-    df_template_v0 = pd.DataFrame(original_sample_dict)
-    df_template_v1 = pd.DataFrame({
-        "Table Name": framework_def['table_name_value'],
-        "Column Name": df_template_v0.columns,
-        "Sample Values": [df_template_v0[col].tolist() for col in df_template_v0.columns],
-    })
+    df_template = cfg_dataset.build_template(original_sample_dict)
 
-    # Fill RAG columns with placeholder
-    for c in framework_def['search_with_RAG']:
-        df_template_v1[c] = "<agent>"
+    # Check if the template you built matches the Pydantic schema the Agent expects
+    check_columns_with_pydantic(df_template, ColumnDefInput)
 
-    # Fill data steward file columns with placeholder
-    for c in framework_def['search_with_data_steward_file']:
-        df_template_v1[c] = "<ds_master>"
-
-    print("✅ Template is ready! Following structure will be filled in the next steps:")
-    print(df_template_v1.head(5))
-
-    return {"template_df": df_template_v1.to_dict(orient='list')}
+    return {"template_df": df_template.to_dict(orient="list")}
 
 
 # --- NODE 2: Fill Master Business Glossary ---
@@ -65,7 +55,7 @@ def fill_master_business_glossary_node(state: AgentState) -> AgentState:
     df_template_updated = template_enricher(
         template_df=df_template,
         enrich_df=df_bg_glossary,
-        join_keys=["Table Name", "Column Name"],
+        join_keys=["bucket_name", "dataset_name", 'table_name', 'column_name'],
         fill_cols=fill_cols,
     )
 
@@ -88,7 +78,7 @@ def fill_master_data_steward_node_and_rag_filter(state: AgentState) -> AgentStat
     df_template_updated = template_enricher(
         template_df=df_template,
         enrich_df=df_do_master,
-        join_keys=["Table Name"],
+        join_keys=["bucket_name", "dataset_name", 'table_name'], # stewards are joined on table level
         fill_cols=fill_cols,
     )
 
@@ -110,7 +100,7 @@ def fill_master_data_steward_node_and_rag_filter(state: AgentState) -> AgentStat
 
     ## Below object will be used to perform RAG searches (column name + sample values,
     # e.g. Account_number: [12345, 67890, 111213])
-    dict_for_RAG_search = dict(zip(df_missing["Column Name"], df_missing["Sample Values"]))
+    dict_for_RAG_search = dict(zip(df_missing["column_name"], df_missing["sample_values"]))
 
     return {
         "template_df": full_dict, # in fact doesn't need to be retrieved but returned as updated object for clarity
@@ -125,9 +115,8 @@ def rag_retrieval_node(state: AgentState, project_root: Path) -> AgentState:
     col_samples = state.get("RAG_cols_with_samples")
 
     # Initialize RAG (assuming paths are relative to root where script is run)
-    # basic_path = Path.cwd()
-    cfg = RAGConfig(project_root=project_root)
-    prep = PrepareRetrieval(cfg)
+    cfg_rag = RAGConfig(project_root=project_root)
+    prep = PrepareRetrieval(cfg_rag)
 
     results = prep.retrieve_for_all_columns(col_samples)
     company_context_prompt = prep.build_prompt_and_format(results)
@@ -159,7 +148,7 @@ def generator_node(state: AgentState):
 
     response = structured_llm.invoke(formatted_messages)
     return {
-        "result": response.columns,
+        "result": response,
         "iterations": state['iterations'] + 1
     }
 
@@ -170,19 +159,28 @@ def validator_node(state: AgentState):
 
     print("--- CRITIC: Reviewing... ---")
 
-    # Calculate counts to check for data loss
-    input_table = state.get('entire_table_context', {})
-    expected_count = len(input_table.get('Column Name', []))
-    actual_count = len(state['result'])
+    model_generation = state['result']
+    model_generation_rows = model_generation.rows
+    model_generation_summary = model_generation.table_summary
 
-    current_work = "\n".join([
-        f"Column: {c.column_name}\n"
-        f"Proposed Description: {c.column_description}\n"
-        f"Source Used: {c.extra__add_source_explained}\n"
-        f"Evidence/Logic: {c.extra__add_citation_of_the_hit}\n"
-        "---"
-        for c in state['result']
-    ])
+    # Calculate counts to make sure the generator did not lose any row
+    input_table = state.get('entire_table_context', {})
+    expected_rows_count = len(list(input_table.values())[0]) # get number of rows from 1st column in the input table
+    generator_rows_count = len(model_generation_rows) # get number of rows
+    # create a message if there is no match
+    if True:
+        if expected_rows_count != generator_rows_count:
+            mismatch_message = (
+                f"we have row count mismatch: expected {expected_rows_count}, "
+                f"but generated {generator_rows_count}."
+                f'Set is_valid = False and state "Missing columns in output".'
+            )
+        else:
+            mismatch_message = " it is great, row count matches expected number."
+
+    # Format the current work of the Generator
+    current_work = [{"row_number": i + 1, **c.model_dump()}
+                    for i, c in enumerate(model_generation_rows)]
 
     # Bring context from state
     rag_company_context = state.get('RAG_company_context', "No additional context provided.")
@@ -193,12 +191,13 @@ def validator_node(state: AgentState):
         rag_company_context=rag_company_context,
         full_table_context=full_table_context,
         current_work=current_work,
-        expected_count=expected_count,
-        actual_count=actual_count
+        current_work_table_summary = model_generation_summary,
+        mismatch_message=mismatch_message
     )
 
     review = critic_llm.invoke(formatted_messages)
 
+    # if false (i.e. not valid):
     if not review.is_valid:
         print(f"--- CRITIC FEEDBACK: {review.feedback} ---")
         return {
@@ -206,6 +205,7 @@ def validator_node(state: AgentState):
             "review_history_validator": [f"Step {state['iterations']} Critic: {review.feedback}"]
         }
 
+    # if all good and no feedback:
     return {
         "error_message": "none",
         "review_history_validator": [f"Critique (Passed): {review.feedback}"]

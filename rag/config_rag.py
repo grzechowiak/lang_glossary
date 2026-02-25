@@ -14,6 +14,8 @@ class RAGConfig:
 
     # Relative path configurations
     docs_dirname: str = "data/docs"
+    excel_dirname: str = "data/master_business_glossary"
+
     persist_dirname: str = "vector_dbs/chroma_db"
 
     # Model and chunking parameters
@@ -28,6 +30,10 @@ class RAGConfig:
     def docs_dir(self) -> Path:
         """Directory containing source .docx files"""
         return self.project_root / self.docs_dirname
+
+    @property
+    def excel_dir(self) -> Path:
+        return self.project_root / self.excel_dirname
 
     @property
     def persist_dir(self) -> Path:
