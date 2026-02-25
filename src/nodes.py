@@ -40,32 +40,6 @@ def prepare_template_node(state: AgentState) -> AgentState:
 
     return {"template_df": df_template.to_dict(orient="list")}
 
-    # framework_def = state.get("framework_def")
-    # original_sample_dict = state.get("source_original_table")
-    #
-    # # Build the Framework
-    # df_template_v0 = pd.DataFrame(original_sample_dict)
-    # df_template_v1 = pd.DataFrame({
-    #     "bucket_name": framework_def['bucket_name'],
-    #     "dataset_name": framework_def['dataset_name'] ,
-    #     "table_name": framework_def['table_name_value'],
-    #     "column_name": df_template_v0.columns,
-    #     "sample_values": [df_template_v0[col].tolist() for col in df_template_v0.columns],
-    # })
-    #
-    # # Fill RAG columns with placeholder
-    # for c in framework_def['search_with_RAG']:
-    #     df_template_v1[c] = "<agent>"
-    #
-    # # Fill data steward file columns with placeholder
-    # for c in framework_def['search_with_data_steward_file']:
-    #     df_template_v1[c] = "<ds_master>"
-    #
-    # print("✅ Template is ready! Following structure will be filled in the next steps:")
-    # print(df_template_v1.head(5))
-    #
-    # return {"template_df": df_template_v1.to_dict(orient='list')}
-
 
 # --- NODE 2: Fill Master Business Glossary ---
 def fill_master_business_glossary_node(state: AgentState) -> AgentState:

@@ -107,16 +107,3 @@ def save_outputs(df_result, context_text, table_summary_text, cfg_paths):
     files["summary"].write_text(table_summary_text, encoding="utf-8")
 
     return files
-
-# def df_to_dict(df: pd.DataFrame) -> Dict[str, List[str]]:
-#     """
-#     Transform each column into a list of string values:
-#       { "colA": ["v1","v2",...], "colB": [...], ... }
-#     """
-#     out: Dict[str, List[str]] = {}
-#
-#     for col in df.columns:
-#         s = df[col].dropna()
-#         out[col] = [str(v) for v in s.tolist()]
-#
-#     return out

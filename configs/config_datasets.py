@@ -76,38 +76,6 @@ class ConfigDatasets:
         self.rag_placeholder = "<agent>"
         self.ds_placeholder = "<ds_master>"
 
-        # self.rag_columns = [
-        #     "business_domain_name",
-        #     "business_sub_domain_name",
-        #     "business_name",
-        #     "column_description",
-        #     "attribute_rationale",
-        #     "attribute_rule"
-        # ]
-        #
-        # self.data_steward_columns = [
-        #     "data_owner_name",
-        #     "data_owner_email"
-        # ]
-        #
-        # self.additional_columns = [
-        #     "sample_values"
-        # ]
-        #
-        # self.columns_to_drop = [
-        #     "data_steward_approval",
-        #     "data_steward_feedback",
-        #     "data_owner_approval",
-        #     "data_owner_feedback"
-        # ]
-
-        #
-        #
-        # # Agent settings
-        # self.max_iterations = 3
-        # self.recursion_limit = 20
-        # self.llm_model = 'gpt-4.1-nano' #"gpt-4o" #"gpt-4o-mini" #'gpt-4.1-nano'
-        # self.llm_temperature = 0.0
 
     def get_framework_dict(self):
         """Return framework settings in the format expected by nodes."""

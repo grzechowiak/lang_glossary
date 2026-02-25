@@ -109,21 +109,6 @@ def main():
                  table_summary_text = df_table_summary,
                  cfg_paths = cfg_paths)
 
-    # # Generate filename
-    # timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # filename = f"{timestamp}_{cfg_paths.output_filename_suffix}.csv"
-    # filename_context_rag = f"{timestamp}_{cfg_paths.output_filename_suffix_context_rag}.txt"
-    # filename_table_summary = f"{timestamp}_{cfg_paths.output_filename_suffix_table_summary}.txt"
-    #
-    # output_file = cfg_paths.output_dir / filename
-    # output_file2 = cfg_paths.output_dir / filename_context_rag
-    # output_file3 = cfg_paths.output_dir / filename_table_summary
-    #
-    # # Save
-    # df_result.to_csv(output_file, index=False, sep=cfg_paths.csv_separator) # final table
-    # output_file2.write_text(context_txt, encoding="utf-8") # context
-    # output_file3.write_text(df_table_summary, encoding="utf-8")  # table_summary
-
     # 7. Display results
     print("\n ✅ Agents Finished!")
     print(f"\n📝 Saved to: {cfg_paths.output_dir}")
