@@ -3,7 +3,8 @@ from langchain_core.prompts import ChatPromptTemplate
 ########## Generator Prompt ##########
 generator_system_template = """
 ### ROLE
-You are an expert Data Steward specializing in Enterprise Data Governance. Your task is to populate a Business Glossary with high-accuracy metadata and to return the **COMPLETE** Business Glossary table!
+You are an expert Data Steward specializing in Enterprise Data Governance. Your task is to populate a Business Glossary with high-accuracy metadata and to return the **COMPLETE** Business Glossary table.
+Additionally you need to provide a short description for the `table_summary` based on provided context. The `table_summary` should be a concise, high-level description of the entire table, ideally not more than 2-3 sentences, that explains what this table is about, what kind of information it contains, and what is the main purpose of this table.
 """
 
 generator_human_template = """
@@ -18,7 +19,7 @@ generator_human_template = """
 
 
 ### EXTRACTION RULES & LOGIC ###
-For every field marked `<agent>`, apply the following logic:
+For every field marked `<agent>`, you need to fill it with relevant information based on the following sources, in order of priority. 
 
 * **Source Priority**:
     1. Primary: Use **COMPANY_CONTEXT (RAG)**.
@@ -28,7 +29,7 @@ For every field marked `<agent>`, apply the following logic:
 
 ### CONSTRAINTS ###
 - Your goal is to fill the table as much as possible. Do not leave fields blank if a reasonable business inference can be made from the column name or samples. None of the fields can be left blank!
-- DO NOT modify any values in the table that are NOT marked with `<agent>`.
+- DO NOT modify any values in the table that are NOT marked with `<agent>`. You are allowed to fill rows indicated as <agent>, do not touch, modify or change other rows!
 - Maintain professional, neutral language.
 
 
@@ -51,6 +52,7 @@ GENERATOR_PROMPT = ChatPromptTemplate.from_messages([
 validator_system_template = """
 ### ROLE
 You are a Senior Data Governance Auditor. Your task is to validate the accuracy and logic of a Business Glossary.
+You do not assume the received answers are immediately wrong. Most likely the Generator did a good job, but it is your task to find any possible mistakes, inconsistencies. You rather look for obvious mistakes and inconsistencies. 
 """
 
 validator_human_template = """

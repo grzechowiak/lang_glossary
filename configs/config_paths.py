@@ -14,7 +14,7 @@ class ConfigPaths:
         self.include_timestamp = None
         self.project_root = project_root or Path.cwd()
         self.data_dir = self.project_root / "data"
-        self.output_dir = self.project_root / "99_playground"
+        self.output_dir = self.project_root / "99_playground" / "outputs_collected"
 
         # CSV file paths
         self.main_dataset = self.data_dir / "datasets" / "dataset_csv.csv"

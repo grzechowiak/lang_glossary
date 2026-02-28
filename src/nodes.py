@@ -85,7 +85,7 @@ def fill_master_data_steward_node_and_rag_filter(state: AgentState) -> AgentStat
     full_dict = df_template_updated.to_dict(orient='list')
 
     print("✅ Master files has been reviewed! Following structure will be sent to an Agent to generate missing fields:")
-    print(df_template_updated.head(5))
+    print(df_template_updated)
 
     ######################## PART 2/2 ########################
     ### When full template is ready, filter only those rows which need to be filled in by RAG
@@ -199,7 +199,7 @@ def validator_node(state: AgentState):
 
     # if false (i.e. not valid):
     if not review.is_valid:
-        print(f"--- CRITIC FEEDBACK: {review.feedback} ---")
+        print(f"--- CRITIC FEEDBACK:\n {review.feedback} ---")
         return {
             "error_message": review.feedback,
             "review_history_validator": [f"Step {state['iterations']} Critic: {review.feedback}"]
