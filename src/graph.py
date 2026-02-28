@@ -10,14 +10,16 @@ from src.nodes import (
 )
 from functools import partial
 from pathlib import Path
+from configs.config_agent import ConfigAgents
+cfg_agents = ConfigAgents()
 
 def router(state: AgentState):
     """Determines next step based on validation results."""
-    print(f"ROUTER: iterations = {state.get('iterations', 0)}, error_message = {state.get('error_message', '')}")
+    print(f"ROUTER: iterations = {state.get('iterations', 0)}")
     if state["error_message"] == "none":
         return "end"
-    if state["iterations"] >= 3:
-        print("!!! Max attempts reached. Ending with current result.")
+    if state["iterations"] >= cfg_agents.max_iterations:
+        print(f"!!! Max attempts ({cfg_agents.max_iterations}) reached. Ending with current result.")
         return "end"
     return "generate"
 

@@ -1,7 +1,7 @@
 import pandas as pd
 
-class ConfigDatasets:
-    """Configuration class"""
+class DatasetColumnMappings:
+    """Defines column mappings between external files and internal representation"""
 
     def __init__(self):
         # Column mappings for CSV file (Business Glossary Master)
@@ -36,35 +36,60 @@ class ConfigDatasets:
             "Data Owner E-Mail": "data_owner_email"
         }
 
+
+class ColumnGroupDefinitions:
+    """Defines groups of columns"""
+
+    def __init__(self):
         # Columns needed to define the template
-        self.define_columns_to_fill = {
-            'key_columns': [
+        self.key_columns = [
                 'bucket_name',
                 'dataset_name',
                 'table_name',
                 'column_name'
-            ],
-            'rag_columns': [
+            ]
+        self.rag_columns = [
                 "business_domain_name",
                 "business_sub_domain_name",
                 "business_name",
                 "column_description",
                 "attribute_rationale",
                 "attribute_rule"
-            ],
-            'data_steward_columns': [
+            ]
+        self.data_steward_columns = [
                 "data_owner_name",
                 "data_owner_email"
-            ],
-            'additional_columns': [
+            ]
+        self.additional_columns = [
                 "sample_values"
-            ],
-            # 'columns_to_drop': [
-            #     "data_steward_approval",
-            #     "data_steward_feedback",
-            #     "data_owner_approval",
-            #     "data_owner_feedback"
-            # ]
+            ]
+        # self.columns_to_drop = [
+        #     "data_steward_approval",
+        #     "data_steward_feedback",
+        #     "data_owner_approval",
+        #     "data_owner_feedback"
+        # ]
+
+
+class ConfigDatasets:
+    """Configuration class for dataset processing"""
+
+    def __init__(self):
+        # Initialize sub-configurations
+        self._column_mappings = DatasetColumnMappings()
+        self._column_groups = ColumnGroupDefinitions()
+
+        #expose the dictionaries via the  attribute names used in other parts of the code
+        self.column_mappings_master_bg = self._column_mappings.column_mappings_master_bg
+        self.column_mappings_master_data_owners = self._column_mappings.column_mappings_master_data_owners
+
+        self.define_columns_to_fill = {
+            'key_columns': self._column_groups.key_columns,
+            'rag_columns': self._column_groups.rag_columns,
+            'data_steward_columns': self._column_groups.data_steward_columns,
+            'additional_columns': self._column_groups.additional_columns,
+            # Uncomment if needed
+            # 'columns_to_drop': self._column_groups.columns_to_drop
         }
 
         # Values which will be taken from the GCP system
@@ -80,13 +105,14 @@ class ConfigDatasets:
     def get_framework_dict(self):
         """Return framework settings in the format expected by nodes."""
         return {
-            "key_col": list(self.define_columns_to_fill["key_columns"]),
-            "additional_col": list(self.define_columns_to_fill["additional_columns"]),
-            "search_with_RAG": list(self.define_columns_to_fill["rag_columns"]),
-            "search_with_data_steward_file": list(self.define_columns_to_fill["data_steward_columns"]),
+            "key_col": list(self._column_groups.key_columns),
+            "additional_col": list(self._column_groups.additional_columns),
+            "search_with_RAG": list(self._column_groups.rag_columns),
+            "search_with_data_steward_file": list(self._column_groups.data_steward_columns),
         }
 
     def template_columns(self):
+        """Return all columns in the template, de-duped and in the right order."""
         fw = self.get_framework_dict()
         cols = (
                 fw["key_col"]
@@ -99,6 +125,7 @@ class ConfigDatasets:
 
 
     def build_template(self, original_sample_dict, bucket=None, dataset=None, table=None):
+        """Build a template DataFrame from sample data."""
         df0 = pd.DataFrame(original_sample_dict)
 
         df = pd.DataFrame({
@@ -110,10 +137,10 @@ class ConfigDatasets:
         df["dataset_name"] = dataset or self.dataset_name_value
         df["table_name"] = table or self.table_name_value
 
-        for c in self.define_columns_to_fill["rag_columns"]:
+        for c in self._column_groups.rag_columns:
             df[c] = self.rag_placeholder
 
-        for c in self.define_columns_to_fill["data_steward_columns"]:
+        for c in self._column_groups.data_steward_columns:
             df[c] = self.ds_placeholder
 
         # enforce schema/order from config
