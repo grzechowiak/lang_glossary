@@ -42,12 +42,17 @@ class PrepareRetrieval:
         return results
 
     def retrieve_for_single_column(self, column_name: str, sample_values: Any, ) -> RetrievedResults:
-        if sample_values is None:
-            sample_values = []
-
-        # Transform values into strings
-        sample_values = [str(val) for val in sample_values]
-        examples = ", ".join([str(v) for v in sample_values if v][:5])
+        if sample_values is None or sample_values == "":
+            examples = ""
+        else:
+            # If sample_values is already a string, use it directly
+            # Otherwise convert to string (for backward compatibility)
+            if isinstance(sample_values, list):
+                examples = ", ".join([str(v) for v in sample_values if v][:5])
+            else:
+                # Just use the first portion of the string if it's too long
+                examples = str(sample_values).split(", ")[:5]
+                examples = ", ".join(examples)
 
         query = (
             f'Find relevant information for the following variable: '

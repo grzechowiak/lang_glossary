@@ -130,7 +130,7 @@ class ConfigDatasets:
 
         df = pd.DataFrame({
             "column_name": df0.columns,
-            "sample_values": [df0[c].tolist() for c in df0.columns],
+            "sample_values": [", ".join(map(str, df0[c].tolist())) for c in df0.columns],
         })
 
         df["bucket_name"] = bucket or self.bucket_name_value

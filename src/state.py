@@ -15,8 +15,8 @@ class ColumnDefInput(BaseModel):
     column_name: str = Field(
         description="The exact (physical) name of the column from the source.")
 
-    sample_values: List[Any] = Field(default=[],
-                                     description="Representative example values illustrating valid content and typical usage.")
+    sample_values: str = Field(default='',
+        description="Representative example values illustrating valid content and typical usage.")
     business_domain_name: str = Field(
         description="The high-level business domain representing a major business capability or functional area.")
     business_sub_domain_name: str = Field(
