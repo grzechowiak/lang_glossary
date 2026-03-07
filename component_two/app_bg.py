@@ -7,11 +7,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel, Field
 
-import domain_bg as domain
+from component_two import domain_bg as domain
 from component_two.utils.data_utils import DataUtils
 
 from datetime import datetime
-
 timestamp = datetime.now().strftime("DATE:_%Y-%m-%d_TIME:_%H-%M-%S")
 
 

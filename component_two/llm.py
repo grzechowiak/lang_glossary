@@ -5,10 +5,9 @@ from typing import Dict, List
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from configs.config import ConfigAgent
+from component_two.configs.config import ConfigAgent
 
 from dotenv import load_dotenv
-
 load_dotenv(override=True)
 
 # Instantiate configuration
