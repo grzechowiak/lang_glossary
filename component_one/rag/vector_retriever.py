@@ -6,7 +6,7 @@ from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 
-from rag.config_rag import RAGConfig
+from component_one.rag.config_rag import RAGConfig
 
 
 class VectorRetriever:

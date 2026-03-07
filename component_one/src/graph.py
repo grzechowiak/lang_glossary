@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
-from src.state import AgentState
-from src.nodes import (
+from component_one.src.state import AgentState
+from component_one.src.nodes import (
     prepare_template_node,
     fill_master_business_glossary_node,
     fill_master_data_steward_node_and_rag_filter,
@@ -10,7 +10,7 @@ from src.nodes import (
 )
 from functools import partial
 from pathlib import Path
-from configs.config_agent import ConfigAgents
+from component_one.configs.config_agent import ConfigAgents
 cfg_agents = ConfigAgents()
 
 def router(state: AgentState):

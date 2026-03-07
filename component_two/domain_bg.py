@@ -8,8 +8,8 @@ from datetime import datetime
 import pandas as pd
 from fastapi import HTTPException
 
-from llm import regenerate_row_with_llm
-from src.state import ColumnDefOutput
+from component_two.llm import regenerate_row_with_llm
+from component_one.src.state import ColumnDefOutput
 from component_two.utils.data_utils import DataUtils
 
 

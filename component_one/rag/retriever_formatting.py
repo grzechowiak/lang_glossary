@@ -3,10 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from rag.config_rag import RAGConfig
-from rag.vector_retriever import VectorRetriever
+from component_one.rag.config_rag import RAGConfig
+from component_one.rag.vector_retriever import VectorRetriever
 
-import pandas as pd
 import json
 
 

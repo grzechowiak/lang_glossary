@@ -11,7 +11,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 
-from rag.config_rag import RAGConfig
+from component_one.rag.config_rag import RAGConfig
 from datetime import datetime
 timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 
