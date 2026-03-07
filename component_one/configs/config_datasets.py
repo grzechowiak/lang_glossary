@@ -93,9 +93,9 @@ class ConfigDatasets:
         }
 
         # Values which will be taken from the GCP system
-        self.bucket_name_value = 'gs_bucket'
-        self.dataset_name_value = 'client'
-        self.table_name_value = "client_account"
+        # self.bucket_name_value = 'gs_bucket'
+        # self.dataset_name_value = 'client'
+        # self.table_name_value = "client_account"
 
         # Placeholders
         self.rag_placeholder = "<agent>"
@@ -124,8 +124,9 @@ class ConfigDatasets:
         return list(dict.fromkeys(cols))
 
 
-    def build_template(self, original_sample_dict, bucket=None, dataset=None, table=None):
+    def build_template(self, original_sample_dict, bucket, dataset, table):
         """Build a template DataFrame from sample data."""
+
         df0 = pd.DataFrame(original_sample_dict)
 
         df = pd.DataFrame({
@@ -133,9 +134,9 @@ class ConfigDatasets:
             "sample_values": [", ".join(map(str, df0[c].tolist())) for c in df0.columns],
         })
 
-        df["bucket_name"] = bucket or self.bucket_name_value
-        df["dataset_name"] = dataset or self.dataset_name_value
-        df["table_name"] = table or self.table_name_value
+        df["bucket_name"] = bucket
+        df["dataset_name"] = dataset
+        df["table_name"] = table
 
         for c in self._column_groups.rag_columns:
             df[c] = self.rag_placeholder

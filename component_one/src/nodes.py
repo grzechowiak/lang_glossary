@@ -4,22 +4,24 @@ from pathlib import Path
 from langchain_openai import ChatOpenAI
 
 # Internal Imports
-from src.state import AgentState, TemplateOutput, ValidationResult
-from rag.config_rag import RAGConfig
-from rag.retriever_formatting import PrepareRetrieval
-from utils.helpers import template_enricher
+from component_one.src.state import AgentState, TemplateOutput, ValidationResult
+from component_one.rag.config_rag import RAGConfig
+from component_one.rag.retriever_formatting import PrepareRetrieval
+from component_one.utils.helpers import template_enricher
 # from config_paths import ConfigPaths
-from configs.config_agent import ConfigAgents
-from src.prompts import GENERATOR_PROMPT, VALIDATOR_PROMPT
-from configs.config_datasets import ConfigDatasets
-from src.state import ColumnDefInput
-from utils.helpers import check_columns_with_pydantic
+from component_one.configs.config_agent import ConfigAgents
+from component_one.src.prompts import GENERATOR_PROMPT, VALIDATOR_PROMPT
+from component_one.configs.config_datasets import ConfigDatasets
+from component_one.src.state import ColumnDefInput
+from component_one.utils.helpers import check_columns_with_pydantic
+from component_one.configs.config_gcp_info import ConfigFetchBucketDatasetTable
 
 # --- LLM Setup ---
 # config = ConfigPaths()
 cfg_agent = ConfigAgents()
 gpt_model = cfg_agent.llm_model
 cfg_dataset = ConfigDatasets()
+cfg_gcp_info = ConfigFetchBucketDatasetTable()
 
 llm = ChatOpenAI(model=gpt_model, temperature=0)
 structured_llm = llm.with_structured_output(TemplateOutput)
@@ -33,7 +35,14 @@ def prepare_template_node(state: AgentState) -> AgentState:
 
     original_sample_dict = state["source_original_table"]
 
-    df_template = cfg_dataset.build_template(original_sample_dict)
+    bucket_fetch = cfg_gcp_info.bucket_name_value
+    dataset_fetch = cfg_gcp_info.dataset_name_value
+    table_fetch = cfg_gcp_info.table_name_value
+    df_template = cfg_dataset.build_template(original_sample_dict,
+                                             bucket = bucket_fetch,
+                                             dataset = dataset_fetch,
+                                             table = table_fetch)
+
 
     # Check if the template you built matches the Pydantic schema the Agent expects
     check_columns_with_pydantic(df_template, ColumnDefInput)
