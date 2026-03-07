@@ -1,5 +1,11 @@
 import os
-import datetime
+import sys
+
+# Get the directory containing component_one and add it to Python's path
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
+
+import os
 import pandas as pd
 # from pathlib import Path
 
@@ -12,20 +18,20 @@ if not os.environ.get("OPENAI_API_KEY"):
     exit(1)
 
 # Import loaders / helpers
-from utils.data_loader import load_data
-from utils.data_loader import validate_expected_columns_in_masters
-from utils.helpers import save_outputs
+from component_one.utils.data_loader import load_data
+from component_one.utils.data_loader import validate_expected_columns_in_masters
+from component_one.utils.helpers import save_outputs
 ##
 
 # Import the graph builder
-from src.graph import build_graph
+from component_one.src.graph import build_graph
 
 # Import Configs
-from configs.config_paths import ConfigPaths
-from rag.config_rag import RAGConfig
-from configs.config_datasets import ConfigDatasets
-from configs.config_agent import ConfigAgents
-from src.state import TemplateOutput
+from component_one.configs.config_paths import ConfigPaths
+from component_one.rag.config_rag import RAGConfig
+from component_one.configs.config_datasets import ConfigDatasets
+from component_one.configs.config_agent import ConfigAgents
+from component_one.src.state import TemplateOutput
 
 def main():
     """Main execution flow - simple and clean."""
@@ -36,11 +42,12 @@ def main():
 
     # 1. Setup configuration
     cfg_paths = ConfigPaths()
-    cfg_rag = RAGConfig(project_root=cfg_paths.project_root)
+    cfg_rag = RAGConfig(project_root=cfg_paths.component_dir_level1)
     cfg_datasets = ConfigDatasets()
     cfg_agents = ConfigAgents()
 
-    print(f"\nProject root: {cfg_paths.project_root}")
+    print("")
+    print("-- Validate Models --")
     print(f"Embedding model: {cfg_rag.embedding_model}")
     print(f"LLM model: {cfg_agents.llm_model}\n")
 
@@ -85,7 +92,7 @@ def main():
     print("STARTING WORKFLOW")
     print("=" * 60 + "\n")
 
-    app = build_graph(project_root=cfg_paths.project_root)
+    app = build_graph(project_root=cfg_paths.component_dir_level1)
 
     try:
         final_output = app.invoke(initial_state, {"recursion_limit": cfg_agents.recursion_limit})
@@ -112,7 +119,7 @@ def main():
 
     # 7. Display results
     print("\n ✅ Agents Finished!")
-    print(f"\n📝 Saved to: {cfg_paths.output_dir}")
+    print(f"\n📝 Saved to: {cfg_paths.output_dir_specific_table}")
     print(f"Columns processed: {len(df_result)}")
     print(f"Iterations: {final_output.get('iterations', 0)}")
 

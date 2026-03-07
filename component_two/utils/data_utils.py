@@ -5,8 +5,8 @@ from datetime import datetime
 import pandas as pd
 from fastapi import HTTPException
 
-from src.state import ColumnDefOutput
-from configs.config_paths import ConfigPaths
+from component_one.src.state import ColumnDefOutput
+from component_one.configs.config_paths import ConfigPaths
 
 
 # Configuration class
@@ -23,7 +23,10 @@ class ColumnConfig:
     CSV_SEPARATOR = config_paths.csv_separator
 
     # Output directory
-    OUTPUT_DIR = config_paths.output_dir
+    OUTPUT_DIR = config_paths.output_dir_component_two_result
+
+    # File name to save
+    OUTPUT_FILENAME = config_paths.output_filename_revised_table
 
 
 class DataUtils:
@@ -119,16 +122,13 @@ class DataUtils:
         """
         output_dir = ColumnConfig.OUTPUT_DIR
         csv_separator = ColumnConfig.CSV_SEPARATOR
+        output_filename = ColumnConfig.OUTPUT_FILENAME
 
         # Ensure output directory exists
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Add timestamp to filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        full_filename = f"{filename_base}_{timestamp}.csv"
-
         # Full path for output file
-        output_path = output_dir / full_filename
+        output_path = output_dir / f"{output_filename}.csv"
 
         # Save DataFrame to CSV using the configured separator
         df.to_csv(

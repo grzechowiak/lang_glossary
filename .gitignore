@@ -18,9 +18,11 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Vector databases / generated DB files
-vector_dbs/
-*.sqlite3
-*.bin
+#vector_dbs/
+#*.sqlite3
+#*.bin
+
+outputs_savings/
 
 
 

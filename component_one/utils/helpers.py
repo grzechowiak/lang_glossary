@@ -2,7 +2,6 @@ import pandas as pd
 from typing import Iterable, List, Dict
 from pydantic import BaseModel
 from typing import Type
-from datetime import datetime
 
 
 def template_enricher(
@@ -87,18 +86,16 @@ def check_columns_with_pydantic(df: pd.DataFrame, schema: Type[BaseModel]) -> bo
 
 def save_outputs(df_result, context_text, table_summary_text, cfg_paths):
     """
-    Saving the final results of the Agent into separate files along with
-    the timestamp
+    Saving the final results of the Agent into separate files along with the timestamp
     """
 
-    cfg_paths.output_dir.mkdir(parents=True, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    saving_dir = cfg_paths.output_dir_specific_table
+    saving_dir.mkdir(parents=True, exist_ok=True)
 
     files = {
-        "csv": cfg_paths.output_dir / f"{timestamp}_{cfg_paths.output_filename_suffix_final_table}.csv",
-        "context": cfg_paths.output_dir / f"{timestamp}_{cfg_paths.output_filename_suffix_context_rag}.txt",
-        "summary": cfg_paths.output_dir / f"{timestamp}_{cfg_paths.output_filename_suffix_table_summary}.txt",
+        "csv": saving_dir / f"{cfg_paths.output_filename_final_table}.csv",
+        "context": saving_dir / f"{cfg_paths.output_filename_context_rag}.txt",
+        "summary": saving_dir / f"{cfg_paths.output_filename_table_summary}.txt",
     }
 
     # Save files
